@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼豆图纸生成器 · Perler Bead Pattern Generator</title>
+<style>
+:root{--bg:#0f1117;--card:#161b22;--border:#21262d;--accent:#7c3aed;
+--accent2:#6d28d9;--text:#e6edf3;--text2:#8b949e;--text3:#484f58;
+--input:#0d1117;--ok:#238636;--ok2:#2ea043;--warn:#d29922;--red:#da3633;
+--blue:#58a6ff;--cyan:#39d2c0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{display:flex;align-items:center;padding:10px 20px;background:var(--card);
+border-bottom:1px solid var(--border);gap:14px;min-height:56px}
+.logo{font-size:28px}
+.title-area h1{font-size:17px;font-weight:700}
+.title-area p{font-size:11px;color:var(--text3)}
+.header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.lang-btn{background:var(--border);color:var(--text2);border:none;padding:5px 12px;
+border-radius:6px;cursor:pointer;font-size:12px}
+.lang-btn:hover{background:var(--accent);color:#fff}
+main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:320px;background:var(--card);border-right:1px solid var(--border);
+padding:14px;overflow-y:auto;flex-shrink:0}
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.section-title{font-size:11px;font-weight:700;color:var(--text2);
+text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px}
+.section-title:first-child{margin-top:4px}
+label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px}
+select,input[type=number]{width:100%;background:var(--input);color:var(--text);
+border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+.row{display:flex;gap:8px;align-items:center}
+.row select,.row input{flex:1}
+.btn{display:block;width:100%;border:none;border-radius:6px;padding:10px;
+font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--ok);color:#fff}
+.btn-primary:hover{background:var(--ok2)}
+.btn-secondary{background:var(--border);color:var(--text);margin-top:6px}
+.btn-secondary:hover{background:#30363d}
+.btn-accent{background:var(--accent);color:#fff;margin-top:6px}
+.btn-accent:hover{background:var(--accent2)}
+.btn:disabled{opacity:.4;cursor:default}
+.sep{height:1px;background:var(--border);margin:14px 0}
+.checkbox-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+.checkbox-row input{accent-color:var(--accent)}
+.checkbox-row span{font-size:13px}
+.preview-area{background:var(--input);border:1px solid var(--border);
+border-radius:8px;padding:10px;margin-top:10px;text-align:center}
+.preview-area canvas{background:#fff;border-radius:4px;display:block;margin:0 auto;cursor:crosshair}
+.color-bar{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
+.color-chip{width:18px;height:18px;border-radius:3px;border:1px solid var(--border);cursor:pointer;
+position:relative}
+.color-chip:hover{transform:scale(1.3);z-index:10}
+.color-chip.active{outline:2px solid var(--accent);outline-offset:1px}
+.info-box{background:var(--input);border:1px solid var(--border);border-radius:6px;
+padding:10px;margin-top:10px;font-size:11px;color:var(--text3);line-height:1.6;max-height:150px;overflow-y:auto}
+.canvas-wrap{flex:1;position:relative;overflow:auto;background:#1a1d24}
+.canvas-wrap canvas{display:block;margin:20px auto}
+#colorLegend{max-height:220px;overflow-y:auto}
+.legend-item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px}
+.legend-swatch{width:14px;height:14px;border-radius:3px;border:1px solid var(--border);flex-shrink:0}
+.legend-count{color:var(--warn);font-weight:600;margin-left:auto;min-width:30px;text-align:right}
+@media(max-width:900px){main{flex-direction:column}
+.sidebar{width:100%;max-height:50vh;border-right:none;border-bottom:1px solid var(--border)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🟣</div>
+  <div class="title-area">
+    <h1 id="tTitle">拼豆图纸生成器</h1>
+    <p id="tSubtitle">上传图片 → 像素化 → 生成拼豆图纸与颜色统计</p>
+  </div>
+  <div class="header-right">
+    <button class="lang-btn" onclick="toggleLang()">中 / EN</button>
+  </div>
+</header>
+<main>
+  <aside class="sidebar">
+    <div class="section-title" id="tImageTitle">图片导入</div>
+    <button class="btn btn-primary" onclick="loadImage()" id="tLoadBtn">📂 上传图片</button>
+
+    <div class="section-title" id="tGridTitle">网格设置</div>
+    <label id="tGridSize">网格大小</label>
+    <select id="gridSize" onchange="onSettingsChange()">
+      <option value="15">15 × 15 (小)</option>
+      <option value="20">20 × 20</option>
+      <option value="25">25 × 25</option>
+      <option value="29" selected>29 × 29 (标准板)</option>
+      <option value="35">35 × 35</option>
+      <option value="40">40 × 40 (大板)</option>
+      <option value="50">50 × 50</option>
+      <option value="60">60 × 60 (超大)</option>
+    </select>
+
+    <label id="tColorCount">最大颜色数</label>
+    <div class="row">
+      <input type="number" id="maxColors" value="16" min="2" max="64" onchange="onSettingsChange()">
+      <span style="font-size:11px;color:var(--text3)" id="tColorHint">越少越容易制作</span>
+    </div>
+
+    <label id="tPalette">颜色板</label>
+    <select id="palette" onchange="onSettingsChange()">
+      <option value="perler">Perler Beads 标准色</option>
+      <option value="hama">Hama Beads 标准色</option>
+      <option value="artkal">Artkal 方块色</option>
+      <option value="all">全色彩 (256色)</option>
+    </select>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="showGrid" checked onchange="redraw()">
+      <span id="tShowGrid">显示网格线</span>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showNums" checked onchange="redraw()">
+      <span id="tShowNums">显示颜色编号</span>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showCoords" onchange="redraw()">
+      <span id="tShowCoords">显示行列坐标</span>
+    </div>
+
+    <div class="sep"></div>
+    <button class="btn btn-accent" id="btnGenerate" onclick="doGenerate()" disabled>✨ 生成图纸</button>
+    <button class="btn btn-secondary" id="btnSavePng" onclick="savePng()" disabled>💾 保存图纸 (PNG)</button>
+    <button class="btn btn-secondary" id="btnSaveLegend" onclick="saveLegend()" disabled>📋 保存图例 (PNG)</button>
+    <button class="btn btn-secondary" id="btnPrint" onclick="doPrint()" disabled>🖨️ 打印</button>
+
+    <div class="sep"></div>
+    <div class="section-title" id="tColorInfo">颜色统计</div>
+    <div id="colorLegend"></div>
+
+    <div class="section-title" id="tPreviewTitle">原图预览</div>
+    <div class="preview-area">
+      <canvas id="srcCanvas" width="200" height="200"></canvas>
+      <div id="srcInfo" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+    </div>
+
+    <div class="info-box" id="infoBox">上传图片开始生成</div>
+  </aside>
+  <section class="content">
+    <div class="canvas-wrap">
+      <canvas id="patternCanvas"></canvas>
+    </div>
+  </section>
+</main>
+
+<script>
+// ═══════════════════════════════════════
+//  I18N
+// ═══════════════════════════════════════
+let lang='zh';
+const T={
+  zh:{title:"拼豆图纸生成器",subtitle:"上传图片 → 像素化 → 生成拼豆图纸与颜色统计",
+    imageTitle:"图片导入",loadBtn:"📂 上传图片",gridTitle:"网格设置",
+    gridSize:"网格大小",colorCount:"最大颜色数",colorHint:"越少越容易制作",
+    palette:"颜色板",showGrid:"显示网格线",showNums:"显示颜色编号",
+    showCoords:"显示行列坐标",generate:"✨ 生成图纸",
+    savePng:"💾 保存图纸 (PNG)",saveLegend:"📋 保存图例 (PNG)",print:"🖨️ 打印",
+    colorInfo:"颜色统计",previewTitle:"原图预览",total:"共 {0} 种颜色，{1} 颗珠子",
+    loading:"处理中...",ready:"图片已加载，点击生成",done:"生成完成！{0}种颜色 {1}颗珠子",
+    noImage:"请先上传图片",saved:"已保存到下载文件夹",printed:"已打开打印窗口",
+    bead:"颗",row:"行",col:"列",paletteNames:["Perler 标准色","Hama 标准色","Artkal 方块色","全色彩"],
+    gridNames:["小","中","标准板","大板","超大"]},
+  en:{title:"Perler Bead Pattern Generator",subtitle:"Upload image → Pixelate → Generate pattern & color count",
+    imageTitle:"Image",loadBtn:"📂 Upload Image",gridTitle:"Grid Settings",
+    gridSize:"Grid Size",colorCount:"Max Colors",colorHint:"Fewer = easier",
+    palette:"Palette",showGrid:"Show Grid Lines",showNums:"Show Color Numbers",
+    showCoords:"Show Row/Col",generate:"✨ Generate Pattern",
+    savePng:"💾 Save Pattern (PNG)",saveLegend:"📋 Save Legend (PNG)",print:"🖨️ Print",
+    colorInfo:"Color Count",previewTitle:"Original Image",total:"{0} colors, {1} beads",
+    loading:"Processing...",ready:"Image loaded, click Generate",done:"Done! {0} colors, {1} beads",
+    noImage:"Upload an image first",saved:"Saved to downloads",printed:"Print window opened",
+    bead:"pcs",row:"R",col:"C",paletteNames:["Perler Standard","Hama Standard","Artkal Cubic","Full Color"],
+    gridNames:["Small","Medium","Standard","Large","XL"]}
+};
+function tk(k,a){let s=T[lang][k]||k;if(a)a.forEach((v,i)=>s=s.replace(`{${i}}`,v));return s}
+function st(id,k,a){const e=document.getElementById(id);if(e)e.textContent=tk(k,a)}
+function refreshUI(){
+  st('tTitle','title');st('tSubtitle','subtitle');st('tImageTitle','imageTitle');
+  document.getElementById('tLoadBtn').textContent=tk('loadBtn');
+  st('tGridTitle','gridTitle');st('tGridSize','gridSize');st('tColorCount','colorCount');
+  st('tColorHint','colorHint');st('tPalette','palette');
+  st('tShowGrid','showGrid');st('tShowNums','showNums');st('tShowCoords','showCoords');
+  document.getElementById('btnGenerate').textContent=tk('generate');
+  document.getElementById('btnSavePng').textContent=tk('savePng');
+  document.getElementById('btnSaveLegend').textContent=tk('saveLegend');
+  document.getElementById('btnPrint').textContent=tk('print');
+  st('tColorInfo','colorInfo');st('tPreviewTitle','previewTitle');
+  if(state.grid)updateLegend();
+}
+function toggleLang(){lang=lang==='zh'?'en':'zh';refreshUI()}
+
+// ═══════════════════════════════════════
+//  PALETTES
+// ═══════════════════════════════════════
+const PERLER=[
+  [255,255,255,"White"],[209,209,209,"Light Grey"],[142,142,142,"Grey"],
+  [85,85,85,"Dark Grey"],[0,0,0,"Black"],[255,183,197,"Raspberry"],
+  [255,0,0,"Red"],[196,0,4,"Dark Red"],[139,0,0,"Maroon"],
+  [255,165,0,"Orange"],[255,219,0,"Yellow"],[255,242,0,"Light Yellow"],
+  [148,222,0,"Lime Green"],[0,178,0,"Green"],[0,106,68,"Dark Green"],
+  [0,191,255,"Light Blue"],[0,118,255,"Blue"],[0,61,165,"Dark Blue"],
+  [38,0,128,"Purple"],[166,83,255,"Light Purple"],[255,0,255,"Magenta"],
+  [220,130,180,"Pink"],[255,202,182,"Peach"],[255,175,128,"Tan"],
+  [182,113,52,"Brown"],[255,204,0,"Gold"]
+];
+const HAMA=[
+  [255,255,255,"White"],[220,220,220,"Light Grey"],[160,160,160,"Grey"],
+  [80,80,80,"Dark Grey"],[0,0,0,"Black"],[255,0,0,"Red"],
+  [180,0,30,"Dark Red"],[255,150,0,"Orange"],[255,230,0,"Yellow"],
+  [180,255,0,"Lime"],[0,160,0,"Green"],[0,80,40,"Dark Green"],
+  [0,200,200,"Cyan"],[0,120,255,"Blue"],[0,40,160,"Dark Blue"],
+  [120,0,200,"Purple"],[200,80,255,"Light Purple"],[255,0,150,"Pink"],
+  [255,180,180,"Light Pink"],[255,200,140,"Peach"],[200,130,60,"Brown"],
+  [140,80,40,"Dark Brown"],[255,220,100,"Gold"],[200,200,100,"Olive"]
+];
+const ARTKAL=[
+  [255,255,255,"White"],[215,215,215,"Lt Grey"],[140,140,140,"Grey"],
+  [70,70,70,"Dk Grey"],[0,0,0,"Black"],[255,50,50,"Red"],
+  [200,0,20,"Dk Red"],[255,160,0,"Orange"],[255,230,0,"Yellow"],
+  [130,230,0,"Lime"],[0,180,0,"Green"],[0,90,50,"Dk Green"],
+  [0,200,220,"Cyan"],[0,130,255,"Blue"],[0,50,180,"Dk Blue"],
+  [100,0,220,"Purple"],[180,60,255,"Lt Purple"],[255,0,180,"Pink"],
+  [255,200,200,"Lt Pink"],[255,210,150,"Peach"],[190,110,50,"Brown"],
+  [120,60,30,"Dk Brown"],[255,210,0,"Gold"],[180,180,60,"Olive"],
+  [255,130,130,"Coral"],[180,220,255,"Sky"],[220,190,255,"Lavender"],
+  [255,200,130,"Apricot"]
+];
+
+function getFullPalette(){
+  const c=[];
+  const steps=[0,51,102,153,204,255];
+  for(const r of steps)for(const g of steps)for(const b of steps)
+    c.push([r,g,b,`#${hex(r)}${hex(g)}${hex(b)}`]);
+  return c;
+}
+function hex(n){return n.toString(16).padStart(2,'0')}
+
+function getPalette(){
+  const p=document.getElementById('palette').value;
+  if(p==='hama')return HAMA;
+  if(p==='artkal')return ARTKAL;
+  if(p==='all')return getFullPalette();
+  return PERLER;
+}
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const state={srcImg:null,grid:null,colors:null,countMap:null};
+
+// ═══════════════════════════════════════
+//  IMAGE LOADING
+// ═══════════════════════════════════════
+function loadImage(){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*';
+  inp.onchange=ev=>{
+    const f=ev.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        state.srcImg=img;
+        // Preview
+        const pc=document.getElementById('srcCanvas');
+        const pctx=pc.getContext('2d');
+        const sc=Math.min(200/img.width,200/img.height);
+        const w=img.width*sc,h=img.height*sc;
+        pc.width=Math.round(w);pc.height=Math.round(h);
+        pctx.drawImage(img,0,0,Math.round(w),Math.round(h));
+        document.getElementById('srcInfo').textContent=`${img.width} × ${img.height}px`;
+        document.getElementById('btnGenerate').disabled=false;
+        document.getElementById('infoBox').textContent=tk('ready');
+      };
+      img.src=e.target.result;
+    };
+    r.readAsDataURL(f);
+  };
+  inp.click();
+}
+
+// ═══════════════════════════════════════
+//  COLOR MAPPING
+// ═══════════════════════════════════════
+function colorDist(a,b){
+  const dr=a[0]-b[0],dg=a[1]-b[1],db=a[2]-b[2];
+  return dr*dr+dg*dg+db*db;
+}
+
+function reduceColors(pixels,palette,maxC){
+  // Count all pixel colors
+  const freq={};
+  for(const p of pixels){
+    const key=`${p[0]},${p[1]},${p[2]}`;
+    if(!freq[key])freq[key]={r:p[0],g:p[1],b:p[2],count:0};
+    freq[key].count++;
+  }
+  // Map each unique color to nearest palette color
+  const mapped={};
+  for(const key in freq){
+    const c=freq[key];
+    let best=0,bestD=Infinity;
+    for(let i=0;i<palette.length;i++){
+      const d=colorDist([c.r,c.g,c.b],palette[i]);
+      if(d<bestD){bestD=d;best=i}
+    }
+    mapped[key]=best;
+  }
+  // Count palette usage
+  const usage={};
+  for(const key in freq){
+    const pi=mapped[key];
+    if(!usage[pi])usage[pi]=0;
+    usage[pi]+=freq[key].count;
+  }
+  // Sort by frequency, keep top maxC
+  const sorted=Object.keys(usage).sort((a,b)=>usage[b]-usage[a]);
+  const keep=sorted.slice(0,maxC).map(Number);
+  // Re-map to keep only top colors
+  const remap={};
+  for(const pi of keep)remap[pi]=pi;
+  // For removed colors, map to nearest kept color
+  const finalMap={};
+  for(const pi of sorted){
+    const n=Number(pi);
+    if(keep.includes(n)){finalMap[n]=n;continue}
+    let best=keep[0],bestD=Infinity;
+    for(const k of keep){
+      const d=colorDist(palette[n],palette[k]);
+      if(d<bestD){bestD=d;best=k}
+    }
+    finalMap[n]=best;
+  }
+  // Build final grid
+  const result=[];
+  for(const p of pixels){
+    const key=`${p[0]},${p[1]},${p[2]}`;
+    let pi=mapped[key];
+    pi=finalMap[pi];
+    result.push(pi);
+  }
+  // Final count
+  const countMap={};
+  for(const pi of result){
+    if(!countMap[pi])countMap[pi]=0;
+    countMap[pi]++;
+  }
+  return{grid:result,countMap};
+}
+
+// ═══════════════════════════════════════
+//  GENERATE
+// ═══════════════════════════════════════
+function doGenerate(){
+  if(!state.srcImg)return;
+  document.getElementById('infoBox').textContent=tk('loading');
+  setTimeout(generateWorker,50);
+}
+
+function generateWorker(){
+  const img=state.srcImg;
+  const gridN=parseInt(document.getElementById('gridSize').value);
+  const maxC=parseInt(document.getElementById('maxColors').value)||16;
+  const palette=getPalette();
+
+  // Sample image into gridNxgridN pixels
+  const tmpC=document.createElement('canvas');
+  tmpC.width=gridN;tmpC.height=gridN;
+  const tmpCtx=tmpC.getContext('2d');
+  // Draw with aspect ratio crop
+  const srcRatio=img.width/img.height;
+  let sx=0,sy=0,sw=img.width,sh=img.height;
+  if(srcRatio>1){sx=(sw-sh)/2;sw=sh}
+  else{sy=(sh-sw)/2;sh=sw}
+  tmpCtx.drawImage(img,sx,sy,sw,sh,0,0,gridN,gridN);
+
+  const imgData=tmpCtx.getImageData(0,0,gridN,gridN);
+  const pixels=[];
+  for(let i=0;i<imgData.data.length;i+=4)
+    pixels.push([imgData.data[i],imgData.data[i+1],imgData.data[i+2]]);
+
+  // Reduce colors
+  const{grid,countMap}=reduceColors(pixels,palette,maxC);
+
+  state.grid=grid;
+  state.colors=palette;
+  state.countMap=countMap;
+  state.gridN=gridN;
+
+  // Draw pattern
+  redraw();
+
+  // Update legend
+  updateLegend();
+
+  // Enable buttons
+  document.getElementById('btnSavePng').disabled=false;
+  document.getElementById('btnSaveLegend').disabled=false;
+  document.getElementById('btnPrint').disabled=false;
+
+  const total=grid.length;
+  const nColors=Object.keys(countMap).length;
+  document.getElementById('infoBox').textContent=tk('done',[nColors,total]);
+}
+
+// ═══════════════════════════════════════
+//  DRAW PATTERN
+// ═══════════════════════════════════════
+function redraw(){
+  const{grid,colors,countMap,gridN}=state;
+  if(!grid)return;
+
+  const cell=22;
+  const coordW=document.getElementById('showCoords').checked?28:0;
+  const coordH=document.getElementById('showCoords').checked?28:0;
+  const pad=16;
+  const cw=coordW+pad*2+gridN*cell;
+  const ch=coordH+pad*2+gridN*cell;
+
+  const cv=document.getElementById('patternCanvas');
+  cv.width=cw;cv.height=ch;
+  const ctx=cv.getContext('2d');
+
+  fillR(ctx,0,0,cw,ch,'#1a1d24');
+
+  const ox=pad+coordW;
+  const oy=pad+coordH;
+
+  // Coord labels
+  if(document.getElementById('showCoords').checked){
+    ctx.fillStyle='#8b949e';ctx.font='10px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let x=0;x<gridN;x++)ctx.fillText(x+1,ox+x*cell+cell/2,pad+coordH/2);
+    for(let y=0;y<gridN;y++)ctx.fillText(y+1,pad+coordW/2,oy+y*cell+cell/2);
+  }
+
+  // Cells
+  const showGrid=document.getElementById('showGrid').checked;
+  const showNums=document.getElementById('showNums').checked;
+
+  // Build color index map for numbering
+  const usedColors=[];
+  const colorIdxMap={};
+  for(const pi in countMap){
+    if(!colorIdxMap[pi]){colorIdxMap[pi]=usedColors.length+1;usedColors.push(Number(pi))}
+  }
+
+  for(let y=0;y<gridN;y++){
+    for(let x=0;x<gridN;x++){
+      const pi=grid[y*gridN+x];
+      const c=colors[pi];
+      const cx=ox+x*cell;const cy=oy+y*cell;
+
+      fillR(ctx,cx,cy,cell,cell,`rgb(${c[0]},${c[1]},${c[2]})`);
+
+      if(showGrid){
+        ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=0.5;
+        ctx.strokeRect(cx+0.25,cy+0.25,cell-0.5,cell-0.5);
+      }
+
+      if(showNums){
+        const ci=colorIdxMap[pi];
+        // Pick text color based on brightness
+        const bright=c[0]*0.299+c[1]*0.587+c[2]*0.114;
+        ctx.fillStyle=bright<128?'#fff':'#000';
+        ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(ci,cx+cell/2,cy+cell/2);
+      }
+    }
+  }
+
+  // Outer border
+  ctx.strokeStyle='#484f58';ctx.lineWidth=2;
+  ctx.strokeRect(ox-1,oy-1,gridN*cell+2,gridN*cell+2);
+
+  // Title
+  ctx.fillStyle='#e6edf3';ctx.font='bold 13px Arial';ctx.textAlign='left';
+  ctx.fillText(`拼豆图纸 · ${gridN}×${gridN} · ${Object.keys(countMap).length}色 / Pattern`,ox,oy-6);
+}
+
+function fillR(ctx,x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
+
+// ═══════════════════════════════════════
+//  LEGEND
+// ═══════════════════════════════════════
+function updateLegend(){
+  const{colors,countMap}=state;
+  if(!countMap)return;
+  const box=document.getElementById('colorLegend');
+  box.innerHTML='';
+
+  const usedColors=[];
+  for(const pi in countMap)usedColors.push({pi:Number(pi),count:countMap[pi]});
+  usedColors.sort((a,b)=>b.count-a.count);
+
+  let total=0;
+  usedColors.forEach((item,i)=>{
+    total+=item.count;
+    const c=colors[item.pi];
+    const div=document.createElement('div');
+    div.className='legend-item';
+    const bright=c[0]*0.299+c[1]*0.587+c[2]*0.114;
+    const hexStr=`#${hex(c[0])}${hex(c[1])}${hex(c[2])}`;
+    div.innerHTML=`<span class="legend-swatch" style="background:rgb(${c[0]},${c[1]},${c[2]})"></span>`+
+      `<span style="font-size:11px;color:var(--text2)">#${i+1} ${c[3]||hexStr}</span>`+
+      `<span class="legend-count">${item.count}${tk('bead')}</span>`;
+    box.appendChild(div);
+  });
+
+  // Total
+  const totDiv=document.createElement('div');
+  totDiv.style.cssText='padding-top:8px;font-size:12px;color:var(--warn);font-weight:600;border-top:1px solid var(--border);margin-top:6px';
+  totDiv.textContent=tk('total',[usedColors.length,total]);
+  box.appendChild(totDiv);
+}
+
+// ═══════════════════════════════════════
+//  SAVE & PRINT
+// ═══════════════════════════════════════
+function savePng(){
+  const cv=document.getElementById('patternCanvas');
+  if(!cv.width)return;
+  const a=document.createElement('a');
+  a.download='perler_pattern.png';
+  a.href=cv.toDataURL('image/png');a.click();
+  document.getElementById('infoBox').textContent=tk('saved');
+}
+
+function saveLegend(){
+  const{colors,countMap}=state;
+  if(!countMap)return;
+
+  const usedColors=[];
+  for(const pi in countMap)usedColors.push({pi:Number(pi),count:countMap[pi]});
+  usedColors.sort((a,b)=>b.count-a.count);
+
+  const lw=360;const lh=40+usedColors.length*26+40;
+  const lc=document.createElement('canvas');lc.width=lw;lc.height=lh;
+  const ctx=lc.getContext('2d');
+  fillR(ctx,0,0,lw,lh,'#fff');
+
+  ctx.fillStyle='#000';ctx.font='bold 16px Arial';ctx.textAlign='left';
+  ctx.fillText('拼豆颜色图例 / Color Legend',16,28);
+
+  let total=0;
+  usedColors.forEach((item,i)=>{
+    const y=40+i*26;total+=item.count;
+    const c=colors[item.pi];
+    ctx.fillStyle=`rgb(${c[0]},${c[1]},${c[2]})`;
+    ctx.fillRect(16,y+3,18,18);
+    ctx.strokeStyle='#888';ctx.lineWidth=1;ctx.strokeRect(16,y+3,18,18);
+    ctx.fillStyle='#333';ctx.font='12px Arial';
+    ctx.fillText(`#${i+1}  ${c[3]||''}`,40,y+15);
+    ctx.fillStyle='#b45309';ctx.font='bold 12px Arial';ctx.textAlign='right';
+    ctx.fillText(`${item.count} ${tk('bead')}`,lw-16,y+15);
+    ctx.textAlign='left';
+  });
+  ctx.fillStyle='#b45309';ctx.font='bold 13px Arial';
+  ctx.fillText(`${tk('total',[usedColors.length,total])}`,16,lh-14);
+
+  const a=document.createElement('a');
+  a.download='perler_legend.png';
+  a.href=lc.toDataURL('image/png');a.click();
+  document.getElementById('infoBox').textContent=tk('saved');
+}
+
+function doPrint(){
+  const cv=document.getElementById('patternCanvas');
+  if(!cv.width)return;
+
+  const{colors,countMap}=state;
+  const usedColors=[];
+  for(const pi in countMap)usedColors.push({pi:Number(pi),count:countMap[pi]});
+  usedColors.sort((a,b)=>b.count-a.count);
+
+  let legendHtml='';
+  let total=0;
+  usedColors.forEach((item,i)=>{
+    total+=item.count;
+    const c=colors[item.pi];
+    const hexStr=`#${hex(c[0])}${hex(c[1])}${hex(c[2])}`;
+    legendHtml+=`<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px">`+
+      `<span style="width:14px;height:14px;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid #888;border-radius:2px;flex-shrink:0"></span>`+
+      `<span>#${i+1} ${c[3]||hexStr}</span>`+
+      `<span style="margin-left:auto;font-weight:700;color:#b45309">${item.count}${tk('bead')}</span></div>`;
+  });
+
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Perler Pattern</title>
+    <style>@page{size:A4 portrait;margin:8mm}
+    body{margin:20px;font-family:Arial,sans-serif}
+    img{max-width:100%;height:auto}
+    h2{margin:0 0 8px}
+    .legend{columns:2;column-gap:20px;margin-top:12px}
+    .total{margin-top:8px;font-weight:700;color:#b45309;font-size:13px;border-top:1px solid #ddd;padding-top:6px}
+    </style></head><body>
+    <h2>拼豆图纸 / Perler Bead Pattern</h2>
+    <p style="font-size:11px;color:#888">${state.gridN}×${state.gridN} · ${usedColors.length} colors · ${total} beads</p>
+    <img src="${cv.toDataURL('image/png')}">
+    <h3>颜色图例 / Color Legend</h3>
+    <div class="legend">${legendHtml}</div>
+    <div class="total">共 ${usedColors.length} 种颜色，${total} 颗珠子 / Total: ${usedColors.length} colors, ${total} beads</div>
+    </body></html>`);
+  win.document.close();
+  win.onload=()=>{try{win.print()}catch(e){}};
+  document.getElementById('infoBox').textContent=tk('printed');
+}
+
+function onSettingsChange(){
+  if(state.srcImg&&document.getElementById('btnGenerate').disabled===false){
+    doGenerate();
+  }
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+refreshUI();
+</script>
+</body>
+</html>
